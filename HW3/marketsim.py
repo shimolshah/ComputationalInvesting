@@ -124,7 +124,9 @@ def generate_trade_matrix(capital):
 
                 trade_matrix.loc[date]["_CASH"] = \
                     trade_matrix.loc[date]["_CASH"] - \
-                        trade_matrix.loc[date][row[3]] * d_data['close'][row[3]][date+dt.timedelta(hours=16)]
+                        b * d_data['close'][row[3]][date+dt.timedelta(hours=16)]
+                if(row[3] == 'GOOG'):
+                    print "--", date, b, trade_matrix.loc[date]["_CASH"]
                 #print trade_matrix.loc[previous_date]["_CASH"]
         previous_date = date    
 
