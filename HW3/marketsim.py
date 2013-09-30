@@ -9,10 +9,11 @@ import QSTK.qstkutil.tsutil as tsu
 import QSTK.qstkstudy.EventProfiler as ep
 import csv
 import sys,getopt
+import bisect
 
 rawdata=[]
 uniqueDates=[]
-uniqueSymboles=[]
+uniqueSymbols=[]
 d_data=[]
 trade_matrix=[]
 holding_matrix=[]
@@ -43,6 +44,7 @@ def preprocess_raw_data():
     
     uniqueDates = list(set(dates))
     uniqueSymbols = list(set(symbols))
+    print "----", uniqueSymbols
 
 def perform_step2():
     global uniqueDates
@@ -95,6 +97,7 @@ def generate_trade_matrix(capital):
     #ldt_timestamps = du.getNYSEdays(dt_start, dt_end, dt_timeofday)
 
     global trade_matrix
+    print "---", uniqueSymbols
     trade_matrix = pd.DataFrame(index=uniqueDates, columns=uniqueSymbols)
     trade_matrix = trade_matrix.fillna(0)
 
@@ -125,8 +128,8 @@ def generate_trade_matrix(capital):
                 trade_matrix.loc[date]["_CASH"] = \
                     trade_matrix.loc[date]["_CASH"] - \
                         b * d_data['close'][row[3]][date+dt.timedelta(hours=16)]
-                if(row[3] == 'GOOG'):
-                    print "--", date, b, trade_matrix.loc[date]["_CASH"]
+                #if(row[3] == 'GOOG'):
+                #    print "--", date, b, trade_matrix.loc[date]["_CASH"]
                 #print trade_matrix.loc[previous_date]["_CASH"]
         previous_date = date    
 
@@ -135,6 +138,7 @@ def generate_holding_matrix():
     uniqueDates = uniqueDates
 
     global holding_matrix
+    print "-----", uniqueSymbols
     holding_matrix = pd.DataFrame(index=uniqueDates, columns=uniqueSymbols)
     holding_matrix = holding_matrix.fillna(0)
 
@@ -148,30 +152,52 @@ def generate_holding_matrix():
 
 def calculate_returns():
     global values_matrix
-    values_matrix = pd.DataFrame(index=uniqueDates, columns=uniqueSymbols)
+
+    a = uniqueDates[1]
+    b = uniqueDates[-1] + dt.timedelta(days=1)
+    ldt_timestamps = du.getNYSEdays(a, b, dt.timedelta(hours=16))
+
+    print "calc", ldt_timestamps[0]
+    print "calc", ldt_timestamps[-1]
+    #dateList = []
+    #for x in range (0, numdays):
+    #    dateList.append(a + dt.timedelta(days = x))
+
+    print "------", uniqueSymbols
+    values_matrix = pd.DataFrame(index=ldt_timestamps, columns=uniqueSymbols)
     values_matrix = values_matrix.fillna(0)
 
-    for date in uniqueDates:
-        c = 0
-        if date != 0:
-            #print d_data['close'].loc[date+dt.timedelta(hours=16)]
-            #print holding_matrix.loc[date]
-            a = d_data['close'].loc[date+dt.timedelta(hours=16)]
-            b = holding_matrix.loc[date]
-            c += a.mul(b)
-            values_matrix.loc[date]=c
-            #print c
-        else:
-            values_matrix.loc[date]=holding_matrix.loc[0]
-            #print
+    for date in ldt_timestamps:
+        #print d_data['close'].loc[date+dt.timedelta(hours=16)]
+        #print holding_matrix.loc[date]
+        #print date
+        #print d_data['close'].loc[date]
+        a = d_data['close'].loc[date]
+        index = bisect.bisect(uniqueDates,date)
+        # print date
+        # print uniqueDates[index-1]
+        b = holding_matrix.loc[uniqueDates[index-1]]
+        #print a
+        #print b
+        c = a.mul(b)
+        #print c
+        values_matrix.loc[date]=c
+        
 
 def write_csv(filename):
+    global values_matrix
     writer = csv.writer(open(filename, 'wb'), delimiter=',')
-    for date in uniqueDates:
+
+    a = uniqueDates[1]
+    b = uniqueDates[-1] + dt.timedelta(days=1)
+    ldt_timestamps = du.getNYSEdays(a, b, dt.timedelta(hours=16))
+
+    for date in ldt_timestamps:
         if(date!=0):
+            print values_matrix.loc[date].cumsum()['_CASH']
             val = values_matrix.loc[date].cumsum()['_CASH']
             list_a = [date.year, date.month, date.day, int(val)]
-            print list_a
+            # print list_a
             writer.writerow(list_a)
         
 if __name__ == '__main__':
@@ -187,11 +213,11 @@ if __name__ == '__main__':
     # print d_data['close']['AAPL']
     generate_trade_matrix(int(sys.argv[1]))
     print "Trading Matrix"
-    print trade_matrix
+    # print trade_matrix
     generate_holding_matrix()
     print "Holding Matrix"
-    print holding_matrix
+    # print holding_matrix
     calculate_returns()
     print "Value Matrix"
-    print values_matrix
+    # print values_matrix
     write_csv(sys.argv[3])
